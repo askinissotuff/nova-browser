@@ -1,0 +1,22 @@
+name: NOVA proxy build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/cloudflare-proxy-foundation]
+
+jobs:
+  container-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check browser engine syntax
+        run: node --check browser-engine.js
+      - name: Check proxy server syntax
+        run: node --check proxy/server.mjs
+      - name: Build proxy container
+        run: docker build -t nova-proxy:ci .
