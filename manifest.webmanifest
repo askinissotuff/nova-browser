@@ -1,0 +1,11 @@
+{
+  "name": "NOVA Web Workspace",
+  "short_name": "NOVA",
+  "description": "A focused in-page web workspace.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090d18",
+  "theme_color": "#090d18",
+  "icons": []
+}
