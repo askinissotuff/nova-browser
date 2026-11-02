@@ -1,15 +1,28 @@
-# NOVA
+# NOVA Browser
 
-A responsive browser-style launchpad with quick links, a search field, recent-search history, and custom shortcuts.
+NOVA is a responsive, browser-style web workspace with internal tabs, an address/search bar, back and forward navigation, bookmarks, browsing history, quick links, and a mobile-friendly dark interface.
 
 ## Run locally
-Open `index.html` in a browser. No build step or API key is required.
+
+Open `index.html` in a modern browser. No build step, API key, or server process is required.
 
 ## Deploy
-This is a static site. Connect this repository to Cloudflare Pages:
+
+The project is a static site and can be hosted on Cloudflare Pages:
 - Framework preset: None
 - Build command: leave empty
 - Build output directory: `/`
+- Production branch: `main`
 
-## Notes
-NOVA is a launchpad, not a full browser engine or a network proxy. Searches use DuckDuckGo by default and open in a separate browser tab. Sites may choose not to allow embedding inside other websites.
+Connect `askinissotuff/nova-browser` to Cloudflare Pages to enable automatic production deploys from pushes to `main` and preview deployments from branches or pull requests.
+
+## Important browser limitations
+
+NOVA is a browser-style web application, not a standalone browser engine. It uses an embedded iframe for destinations that permit embedding. Many sites deliberately send browser security headers that prevent iframe display; those sites cannot be made to work inside this app without changing their security settings. NOVA does not include a proxy or a network-restriction bypass.
+
+Bookmarks and browsing history are stored locally in the browser using localStorage. They are not synced between devices.
+
+## Project
+
+- `index.html` — application UI and client-side behavior
+- `_headers` — security headers for static hosting
