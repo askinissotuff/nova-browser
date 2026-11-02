@@ -1,28 +1,37 @@
 # NOVA Browser
 
-NOVA is a responsive, browser-style web workspace with internal tabs, an address/search bar, back and forward navigation, bookmarks, browsing history, quick links, and a mobile-friendly dark interface.
+NOVA is a responsive web workspace with internal tabs, in-page navigation, search, bookmarks, history, theme settings, and an offline app shell.
+
+## Features
+- Responsive desktop and mobile layout
+- Internal tabs with close and new-tab controls
+- Address bar, search, back, forward, reload, and home
+- Local bookmarks and browsing history
+- Dark and light appearance modes
+- Keyboard shortcuts: Ctrl/Cmd+L, Ctrl/Cmd+T, Ctrl/Cmd+W
+- Installable web-app manifest and offline shell caching
+- Embedded pages run in a sandbox that does not grant pop-ups or top-level navigation
 
 ## Run locally
-
-Open `index.html` in a modern browser. No build step, API key, or server process is required.
+Open `index.html` in a modern browser. Use a local HTTP server to enable service-worker and install features.
 
 ## Deploy
-
-The project is a static site and can be hosted on Cloudflare Pages:
+Static Cloudflare Pages project:
 - Framework preset: None
-- Build command: leave empty
+- Build command: empty
 - Build output directory: `/`
 - Production branch: `main`
 
-Connect `askinissotuff/nova-browser` to Cloudflare Pages to enable automatic production deploys from pushes to `main` and preview deployments from branches or pull requests.
+## Browser limitations
+NOVA is a web app, not a standalone browser engine. External sites are displayed in a sandboxed iframe. Some sites prohibit iframe embedding or require browser-level capabilities that an embedded page cannot provide. NOVA keeps navigation within its own page and displays an in-page explanation when an embedded destination cannot be displayed.
 
-## Important browser limitations
+The app does not alter the access permissions of the network or destination websites.
 
-NOVA is a browser-style web application, not a standalone browser engine. It uses an embedded iframe for destinations that permit embedding. Many sites deliberately send browser security headers that prevent iframe display; those sites cannot be made to work inside this app without changing their security settings. NOVA does not include a proxy or a network-restriction bypass.
+Bookmarks, history, appearance, and open tabs are saved in the current browser's local storage and do not sync between devices.
 
-Bookmarks and browsing history are stored locally in the browser using localStorage. They are not synced between devices.
-
-## Project
-
-- `index.html` — application UI and client-side behavior
-- `_headers` — security headers for static hosting
+## Files
+- `index.html` — app interface and behavior
+- `manifest.webmanifest` — install metadata
+- `sw.js` — offline shell caching
+- `icon.svg` — app icon
+- `_headers` — security response headers
