@@ -1,7 +1,7 @@
 // Scramjet's worker must be imported before registering shell handlers.
 importScripts("/controller/controller.sw.js");
 
-const CACHE = "nova-shell-v7";
+const CACHE = "nova-shell-v8";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -40,9 +40,9 @@ self.addEventListener("fetch", (event) => {
   // return "Cannot GET /~/sj/...".
   if (url.pathname.startsWith("/~/sj/")) {
     event.respondWith((async () => {
-      const deadline = Date.now() + 1200;
+      const deadline = Date.now() + 8000;
       while (Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         if (scramjet?.shouldRoute(event)) return scramjet.route(event);
       }
       return new Response(
