@@ -63,7 +63,12 @@ server.on("upgrade", (req, socket, head) => {
   }
 
   // Only accept browser WebSocket upgrades originating from this app origin.
-  let expectedProtocol = req.socket.encrypted ? "https:" : "http:";\n  // The Worker terminates TLS before forwarding HTTP to the container.\n  try {\n    const edgeInfo = JSON.parse(String(req.headers["cf-visitor"] ?? "{}"));\n    if (edgeInfo.scheme === "https" || edgeInfo.scheme === "http") expectedProtocol = edgeInfo.scheme + ":";\n  } catch { /* local/non-Cloudflare request: use the socket scheme */ }
+  let expectedProtocol = req.socket.encrypted ? "https:" : "http:";
+  // The Worker terminates TLS before forwarding HTTP to the container.
+  try {
+    const edgeInfo = JSON.parse(String(req.headers["cf-visitor"] ?? "{}"));
+    if (edgeInfo.scheme === "https" || edgeInfo.scheme === "http") expectedProtocol = edgeInfo.scheme + ":";
+  } catch { /* local/non-Cloudflare request: use the socket scheme */ }
   if (
     origin.host !== req.headers.host ||
     origin.protocol !== expectedProtocol ||
@@ -109,7 +114,8 @@ server.on("upgrade", (req, socket, head) => {
     return;
   }
 
-  connectionCounts.set(ip, active + 1);\n  totalConnections += 1;
+  connectionCounts.set(ip, active + 1);
+  totalConnections += 1;
   socket.once("close", () => {
     const remaining = (connectionCounts.get(ip) ?? 1) - 1;
     if (remaining > 0) connectionCounts.set(ip, remaining);
