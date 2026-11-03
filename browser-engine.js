@@ -80,7 +80,16 @@
     const controller = await initialize();
     let frame = managed.get(element);
     if (!frame) {
-      frame = controller.createFrame(element);
+      const utils = window.$scramjetUtils;
+      const eventHandler = new utils.EventHandlerPlugin();
+      // utils 0.0.3 requires events to be enabled explicitly.
+      eventHandler.addEventToCapture("click");
+      frame = controller.createFrame(element, {
+        plugins: [
+          eventHandler,
+          new utils.LinkHandlerPlugin((url) => frame.go(url))
+        ]
+      });
       managed.set(element, frame);
     }
     frame.go(new URL(destination).href);
