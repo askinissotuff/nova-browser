@@ -21,7 +21,7 @@ Object.assign(wisp.options, {
   allow_udp_streams: false,
   allow_tcp_streams: true,
   stream_limit_total: 24,
-  stream_limit_per_host: 6,
+  stream_limit_per_host: -1,
   port_whitelist: [80, 443],
   hostname_blacklist: [/^(?:localhost|metadata|metadata\.google\.internal|instance-data)(?:\.|$)/i, /(?:^|\.)(?:localhost|local|internal)$/i],
   parse_real_ip: false
