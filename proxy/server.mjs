@@ -3,6 +3,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import express from "express";
+import { isIP } from "node:net";
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { server as wisp } from "@mercuryworkshop/wisp-js/server";
 
@@ -92,12 +93,17 @@ server.on("upgrade", (req, socket, head) => {
     return;
   }
 
-  // Cloudflare supplies CF-Connecting-IP at the edge. Fall back to the
-  // immediate peer for local development; never trust X-Forwarded-For here.
-  const forwardedIp = req.headers["cf-connecting-ip"];
-  const ip = (typeof forwardedIp === "string" && forwardedIp.length <= 64
-    ? forwardedIp
-    : req.socket.remoteAddress) || "unknown";
+  // Prefer Cloudflare's edge-provided client address. Render deployments
+  // without Cloudflare use the first valid address in Render's forwarded chain.
+  // Validate both headers as IP literals before using them as rate-limit keys.
+  const cfIp = req.headers["cf-connecting-ip"];
+  const forwarded = req.headers["x-forwarded-for"];
+  const forwardedIp = typeof cfIp === "string" && isIP(cfIp.trim())
+    ? cfIp.trim()
+    : typeof forwarded === "string"
+      ? forwarded.split(",").map((value) => value.trim()).find((value) => isIP(value))
+      : undefined;
+  const ip = forwardedIp || req.socket.remoteAddress || "unknown";
   const now = Date.now();
 
   for (const [key, window] of connectionWindows) {
