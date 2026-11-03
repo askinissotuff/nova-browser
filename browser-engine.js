@@ -71,7 +71,20 @@
         }
       });
       await controller.wait();
-      setInterval(() => navigator.serviceWorker.controller?.postMessage("keepalive"), 15000);
+      // Keep Scramjet's in-memory frame table alive on mobile browsers.
+      // iOS may suspend timers in background tabs, so also ping immediately
+      // whenever Safari restores or focuses this page.
+      const wakeServiceWorker = () => {
+        try { navigator.serviceWorker.controller?.postMessage("keepalive"); }
+        catch { /* The browser may be replacing the worker during an update. */ }
+      };
+      wakeServiceWorker();
+      setInterval(wakeServiceWorker, 10000);
+      window.addEventListener("focus", wakeServiceWorker);
+      window.addEventListener("pageshow", wakeServiceWorker);
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) wakeServiceWorker();
+      });
       return controller;
     })().catch((error) => { ready = null; throw error; });
     return ready;
