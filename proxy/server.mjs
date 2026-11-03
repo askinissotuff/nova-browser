@@ -30,6 +30,8 @@ Object.assign(wisp.options, {
 app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
   res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; frame-src 'self' https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' https:; frame-ancestors 'none'");
   next();
@@ -127,6 +129,8 @@ server.on("upgrade", (req, socket, head) => {
   });
 
   try {
+    // Wisp expects the normalized endpoint path, not the full client URL.
+    req.url = "/wisp/";
     wisp.routeRequest(req, socket, head);
   } catch {
     socket.destroy();
