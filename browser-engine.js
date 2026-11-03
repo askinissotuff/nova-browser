@@ -21,13 +21,37 @@
         throw new Error("Proxy browsing requires HTTPS.");
       const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
       await navigator.serviceWorker.ready;
-      if (!navigator.serviceWorker.controller) {
-        await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error("Reload NOVA to activate its proxy service worker.")), 12000);
-          navigator.serviceWorker.addEventListener("controllerchange", () => { clearTimeout(timer); resolve(); }, { once: true });
-        });
-      }
-      const serviceworker = navigator.serviceWorker.controller || registration.active;
+
+      // Safari and Chromium can dispatch controllerchange while ready is
+      // resolving. Subscribe first, then re-check, so that transition cannot
+      // be missed and leave the app using an active-but-not-controlling worker.
+      const serviceworker = await new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (worker) => {
+          if (settled || !worker) return;
+          settled = true;
+          clearTimeout(timer);
+          navigator.serviceWorker.removeEventListener("controllerchange", check);
+          resolve(worker);
+        };
+        const check = () => {
+          const worker = navigator.serviceWorker.controller;
+          if (worker) finish(worker);
+        };
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          navigator.serviceWorker.removeEventListener("controllerchange", check);
+          reject(new Error("NOVA's proxy service worker is installed but this tab is not controlled. Close other NOVA tabs, reopen NOVA, and retry."));
+        }, 20000);
+        navigator.serviceWorker.addEventListener("controllerchange", check);
+        check();
+        // A registration's active worker is not sufficient: only the
+        // controller intercepts /~/sj/ requests for this page.
+        if (registration.active && navigator.serviceWorker.controller) {
+          finish(navigator.serviceWorker.controller);
+        }
+      });
       await loadScript("/scram/scramjet.js");
       await loadScript("/controller/controller.api.js");
       await loadScript("/utils/scramjet-utils.js");
