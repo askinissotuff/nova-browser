@@ -38,7 +38,7 @@ jobs:
             sleep 2
           done
           test "$healthy" = true
-          curl --fail --silent --output /dev/null http://127.0.0.1:8080/
-          node --input-type=module -e 'import net from "node:net"; const s=net.connect(8080,"127.0.0.1",()=>s.write("GET /wisp/ HTTP/1.1\\r\\nHost: 127.0.0.1:8080\\r\\nOrigin: https://attacker.test\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\nSec-WebSocket-Version: 13\\r\\n\\r\\n")); let d=""; s.on("data",b=>d+=b); s.on("close",()=>{if(!d.startsWith("HTTP/1.1 403")){console.error(d);process.exitCode=1}}); setTimeout(()=>s.destroy(),3000).unref();'scram/scramjet.js
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/scram/scramjet.js
           curl --fail --silent --output /dev/null http://127.0.0.1:8080/controller/controller.api.js
           curl --fail --silent --output /dev/null http://127.0.0.1:8080/
+          node --input-type=module -e 'import net from "node:net"; const s=net.connect(8080,"127.0.0.1",()=>s.write("GET /wisp/ HTTP/1.1\\r\\nHost: 127.0.0.1:8080\\r\\nOrigin: https://attacker.test\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\nSec-WebSocket-Version: 13\\r\\n\\r\\n")); let d=""; s.on("data",b=>d+=b); s.on("close",()=>{if(!d.startsWith("HTTP/1.1 403")){console.error(d);process.exitCode=1}}); setTimeout(()=>s.destroy(),3000).unref();'
