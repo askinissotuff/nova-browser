@@ -88,8 +88,17 @@
       eventHandler.addEventToCapture("contextmenu");
       frame = controller.createFrame(element, {
         plugins: [
+          new utils.HttpCachePlugin(),
+          new utils.UrlWatcherPlugin((url) => {
+            element.dispatchEvent(new CustomEvent("nova:urlchange", { detail: { url } }));
+          }),
           eventHandler,
-          new utils.LinkHandlerPlugin((url) => frame.go(url instanceof URL ? url.href : String(url)))
+          new utils.LinkHandlerPlugin((url) => {
+            // Scramjet reports target=_blank and middle-click links here.
+            // NOVA intentionally keeps navigation in the current workspace tab.
+            try { frame.go(url instanceof URL ? url.href : String(url)); }
+            catch { /* Ignore malformed or unsupported destinations. */ }
+          })
         ]
       });
       // Scramjet 2.0.67-alpha.2 can turn an omitted History API URL
