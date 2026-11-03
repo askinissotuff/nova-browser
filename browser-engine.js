@@ -92,6 +92,19 @@
           new utils.LinkHandlerPlugin((url) => frame.go(url instanceof URL ? url.href : String(url)))
         ]
       });
+      // Scramjet 2.0.67-alpha.2 can turn an omitted History API URL
+      // into "/undefined". Modern single-page apps often omit that optional
+      // argument, so preserve the current proxied URL in that case.
+      frame.hooks.init.post.tap((context) => {
+        if (!context.isTopLevel) return;
+        const history = context.window.history;
+        for (const method of ["pushState", "replaceState"]) {
+          const original = history[method];
+          history[method] = function (state, unused, url) {
+            return original.call(this, state, unused, url ?? context.client.url.href);
+          };
+        }
+      });
       managed.set(element, frame);
     }
     frame.go(new URL(destination).href);
