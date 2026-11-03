@@ -1,7 +1,7 @@
 // Scramjet's worker must be imported before registering shell handlers.
 importScripts("/controller/controller.sw.js");
 
-const CACHE = "nova-shell-v6";
+const CACHE = "nova-shell-v7";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -26,11 +26,36 @@ self.addEventListener("fetch", (event) => {
 
   if (url.origin !== self.location.origin) return;
 
-  // Scramjet must see ALL proxied methods (GET, POST, etc.) before
-  // the shell cache's GET-only restriction. Search, translation, sign-in,
-  // and many media APIs send POST requests through the proxy.
-  if (self.$scramjetController?.shouldRoute(event)) {
-    event.respondWith(self.$scramjetController.route(event));
+  const scramjet = self.$scramjetController;
+
+  // Route registered Scramjet frames immediately.
+  if (scramjet?.shouldRoute(event)) {
+    event.respondWith(scramjet.route(event));
+    return;
+  }
+
+  // A restarted service worker can briefly lose its in-memory frame table.
+  // Keep this fetch event alive while the controller sends its revive message
+  // and re-registers the existing frame prefix, rather than letting Express
+  // return "Cannot GET /~/sj/...".
+  if (url.pathname.startsWith("/~/sj/")) {
+    event.respondWith((async () => {
+      const deadline = Date.now() + 1200;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        if (scramjet?.shouldRoute(event)) return scramjet.route(event);
+      }
+      return new Response(
+        "NOVA could not restore this proxy tab. Reload the NOVA tab and retry.",
+        {
+          status: 503,
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "no-store"
+          }
+        }
+      );
+    })());
     return;
   }
 
