@@ -31,6 +31,9 @@ Object.assign(wisp.options, {
 app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "no-referrer");
+  // Enable cross-origin isolation for proxied sites that rely on SharedArrayBuffer.
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
   res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https: blob:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https: blob:; media-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' https: ws: wss:; frame-src 'self' https: blob:; worker-src 'self' blob: https:; object-src 'none'; base-uri 'self'; form-action 'self' https:; frame-ancestors 'none'");
   next();
