@@ -118,6 +118,7 @@ server.on("upgrade", (req, socket, head) => {
   connectionCounts.set(ip, active + 1);
   totalConnections += 1;
   socket.once("close", () => {
+    totalConnections = Math.max(0, totalConnections - 1);
     const remaining = (connectionCounts.get(ip) ?? 1) - 1;
     if (remaining > 0) connectionCounts.set(ip, remaining);
     else connectionCounts.delete(ip);
