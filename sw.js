@@ -26,8 +26,11 @@ self.addEventListener("fetch", (event) => {
 
   if (url.origin !== self.location.origin || request.method !== "GET") return;
 
-  // Scramjet owns proxied requests. Never compete with its respondWith().
-  if (self.$scramjetController?.shouldRoute(event)) return;
+  // Scramjet owns proxied requests; route them before shell-cache handling.
+  if (self.$scramjetController?.shouldRoute(event)) {
+    event.respondWith(self.$scramjetController.route(event));
+    return;
+  }
 
   // Runtime files and the Wisp tunnel must always reach the network.
   if (
