@@ -74,12 +74,19 @@ server.on("upgrade", (req, socket, head) => {
     const edgeInfo = JSON.parse(String(req.headers["cf-visitor"] ?? "{}"));
     if (edgeInfo.scheme === "https" || edgeInfo.scheme === "http") expectedProtocol = edgeInfo.scheme + ":";
   } catch { /* local/non-Cloudflare request: use the socket scheme */ }
+  let pathname;
+  try {
+    pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+  } catch {
+    rejectUpgrade(socket);
+    return;
+  }
   if (
     origin.host !== req.headers.host ||
     origin.protocol !== expectedProtocol ||
     origin.username ||
     origin.password ||
-    new URL(req.url ?? "/", "http://localhost").pathname !== "/wisp/"
+    pathname !== "/wisp/"
   ) {
     rejectUpgrade(socket);
     return;
