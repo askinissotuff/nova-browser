@@ -1,6 +1,6 @@
 importScripts("/controller/controller.sw.js");
 
-const CACHE = "nova-shell-v6";
+const CACHE = "nova-shell-v7";
 const SHELL = ["/", "/index.html", "/browser-engine.js", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
