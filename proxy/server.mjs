@@ -24,7 +24,7 @@ Object.assign(wisp.options, {
   stream_limit_per_host: -1,
   port_whitelist: [80, 443],
   hostname_blacklist: [/^(?:localhost|metadata|metadata\.google\.internal|instance-data)(?:\.|$)/i, /(?:^|\.)(?:localhost|local|internal)$/i],
-  parse_real_ip: false
+  parse_real_ip: true
 });
 
 app.use((_req, res, next) => {
@@ -46,8 +46,8 @@ const server = http.createServer(app);
 const connectionCounts = new Map();
 const connectionWindows = new Map();
 const WINDOW_MS = 60_000;
-const MAX_CONNECTIONS_PER_IP = 6;
-const MAX_NEW_CONNECTIONS_PER_WINDOW = 20;
+const MAX_CONNECTIONS_PER_IP = 16;
+const MAX_NEW_CONNECTIONS_PER_WINDOW = 80;
 const MAX_TOTAL_CONNECTIONS = 250;
 let totalConnections = 0;
 
