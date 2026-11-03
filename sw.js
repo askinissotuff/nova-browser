@@ -1,7 +1,7 @@
 // Scramjet's worker must be imported before registering shell handlers.
 importScripts("/controller/controller.sw.js");
 
-const CACHE = "nova-shell-v5";
+const CACHE = "nova-shell-v6";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -24,13 +24,18 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  if (url.origin !== self.location.origin || request.method !== "GET") return;
+  if (url.origin !== self.location.origin) return;
 
-  // Scramjet owns proxied requests; route them before shell-cache handling.
+  // Scramjet must see ALL proxied methods (GET, POST, etc.) before
+  // the shell cache's GET-only restriction. Search, translation, sign-in,
+  // and many media APIs send POST requests through the proxy.
   if (self.$scramjetController?.shouldRoute(event)) {
     event.respondWith(self.$scramjetController.route(event));
     return;
   }
+
+  // The shell cache only handles same-origin GET requests.
+  if (request.method !== "GET") return;
 
   // Runtime files and the Wisp tunnel must always reach the network.
   if (
