@@ -3,9 +3,7 @@
   "name": "nova-browser",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-02",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "containers": [
     {
       "class_name": "NovaProxyContainer",
@@ -22,16 +20,31 @@
       }
     ]
   },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": [
-        "NovaProxyContainer"
-      ]
+  "exports": {
+    "NovaProxyContainer": {
+      "type": "durable-object",
+      "storage": "sqlite"
     }
-  ],
+  },
   "observability": {
     "enabled": true
   },
-  "previews": {}
+  "previews": {
+    "containers": [
+      {
+        "class_name": "NovaProxyContainer",
+        "image": "./Dockerfile",
+        "instance_type": "basic",
+        "max_instances": 1
+      }
+    ],
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "NOVA_PROXY",
+          "class_name": "NovaProxyContainer"
+        }
+      ]
+    }
+  }
 }
