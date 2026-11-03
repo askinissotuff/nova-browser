@@ -96,19 +96,6 @@
           })
         ]
       });
-      // Scramjet 2.0.67-alpha.2 can turn an omitted History API URL
-      // into "/undefined". Modern single-page apps often omit that optional
-      // argument, so preserve the current proxied URL in that case.
-      frame.hooks.init.post.tap((context) => {
-        // Preserve SPA history semantics in proxied browsing contexts.
-        const history = context.window.history;
-        for (const method of ["pushState", "replaceState"]) {
-          const original = history[method];
-          history[method] = function (state, unused, url) {
-            return original.call(this, state, unused, url ?? context.client.url.href);
-          };
-        }
-      });
       managed.set(element, frame);
     }
     frame.go(new URL(destination).href);
