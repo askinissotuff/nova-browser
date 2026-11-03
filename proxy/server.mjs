@@ -69,11 +69,13 @@ server.on("upgrade", (req, socket, head) => {
 
   // Only accept browser WebSocket upgrades originating from this app origin.
   let expectedProtocol = req.socket.encrypted ? "https:" : "http:";
-  // The Worker terminates TLS before forwarding HTTP to the container.
+  // Render and Cloudflare terminate TLS at the edge before forwarding HTTP.
+  const forwardedProto = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0].trim();
+  if (forwardedProto === "https" || forwardedProto === "http") expectedProtocol = forwardedProto + ":";
   try {
     const edgeInfo = JSON.parse(String(req.headers["cf-visitor"] ?? "{}"));
     if (edgeInfo.scheme === "https" || edgeInfo.scheme === "http") expectedProtocol = edgeInfo.scheme + ":";
-  } catch { /* local/non-Cloudflare request: use the socket scheme */ }
+  } catch { /* local/non-edge request: use the socket or forwarded scheme */ }
   let pathname;
   try {
     pathname = new URL(req.url ?? "/", "http://localhost").pathname;
