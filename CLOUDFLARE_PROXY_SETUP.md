@@ -16,7 +16,7 @@ This branch adds a first deployment scaffold using a Cloudflare Worker and Cloud
 6. Only then attach the production hostname. This Worker serves the app shell and proxy together; switch the Pages route only when ready.
 
 ## Security and launch checklist
-The proxy can act as an open web gateway. Before public launch, implement per-session and per-IP rate limits, connection caps, timeouts, monitoring, and an acceptable-use policy. Do not log full URLs, cookies, authorization headers, or page contents. Validate target URLs and block private, loopback, link-local, and metadata-service destinations to prevent SSRF.
+The proxy can act as an open web gateway. Before public launch, put the proxy behind Cloudflare Access or an equivalent authenticated session gate; the current same-origin check is not authentication. Add edge-level WAF rate limits (the in-process limits are per-container-instance and reset on restarts), connection caps, timeouts, monitoring, and an acceptable-use policy. Do not log full URLs, cookies, authorization headers, or page contents. Validate target URLs and block private, loopback, link-local, and metadata-service destinations to prevent SSRF.
 
 ## Current validation status
 The feature branch CI validates the Wrangler Worker bundle, browser/server JavaScript syntax, Docker image build, container health endpoint, required Scramjet static assets, and rejection of a cross-origin Wisp WebSocket upgrade. These checks do not yet prove a real browser can navigate websites through Scramjet/Wisp. A staging deployment and browser-level end-to-end test are still required. The current Cloudflare account cannot provision Containers until its Workers Paid plan requirement is met.
