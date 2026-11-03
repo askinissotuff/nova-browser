@@ -20,20 +20,20 @@ jobs:
         run: node --check proxy/server.mjs
       - name: Build proxy container
         run: docker build -t nova-proxy:ci .
-
       - name: Start proxy container
         run: |
           docker run -d --rm --name nova-proxy-ci -p 8080:8080 nova-proxy:ci
-          trap 'docker stop nova-proxy-ci' EXIT
+          trap 'docker stop nova-proxy-ci >/dev/null 2>&1 || true' EXIT
+          healthy=false
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:8080/health; then
+              healthy=true
               echo
               break
             fi
             sleep 2
           done
-          curl --fail --silent http://127.0.0.1:8080/health
+          test "$healthy" = true
           curl --fail --silent --output /dev/null http://127.0.0.1:8080/scram/scramjet.js
           curl --fail --silent --output /dev/null http://127.0.0.1:8080/controller/controller.api.js
           curl --fail --silent --output /dev/null http://127.0.0.1:8080/
-          docker stop nova-proxy-ci
