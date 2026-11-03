@@ -1,4 +1,7 @@
-const CACHE = "nova-shell-v4";
+// Scramjet's worker must be imported before registering shell handlers.
+importScripts("/controller/controller.sw.js");
+
+const CACHE = "nova-shell-v5";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -12,7 +15,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith("nova-shell-") && key !== CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -23,10 +26,11 @@ self.addEventListener("fetch", (event) => {
 
   if (url.origin !== self.location.origin || request.method !== "GET") return;
 
-  // Never cache proxied destinations, proxy transport, or executable engine assets.
-  // Caching these can replay stale third-party HTML/JS after a deployment.
+  // Scramjet owns proxied requests. Never compete with its respondWith().
+  if (self.$scramjetController?.shouldRoute(event)) return;
+
+  // Runtime files and the Wisp tunnel must always reach the network.
   if (
-    url.pathname.startsWith("/~/sj/") ||
     url.pathname.startsWith("/wisp/") ||
     url.pathname.startsWith("/scram/") ||
     url.pathname.startsWith("/controller/") ||
