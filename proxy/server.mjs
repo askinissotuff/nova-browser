@@ -46,7 +46,8 @@ const connectionWindows = new Map();
 const WINDOW_MS = 60_000;
 const MAX_CONNECTIONS_PER_IP = 6;
 const MAX_NEW_CONNECTIONS_PER_WINDOW = 20;
-const MAX_TOTAL_CONNECTIONS = 250;\nlet totalConnections = 0;
+const MAX_TOTAL_CONNECTIONS = 250;
+let totalConnections = 0;
 
 function rejectUpgrade(socket, status = "403 Forbidden") {
   socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
