@@ -1,25 +1,28 @@
-# NOVA Cloudflare proxy deployment
+# NOVA Scramjet free deployment
 
-This branch adds a first deployment scaffold using a Cloudflare Worker and Cloudflare Container.
+This branch uses Scramjet with a Wisp WebSocket transport. Cloudflare Containers are not required.
 
-## Architecture
-- The Worker routes requests to one named Container instance.
-- The Container runs the Node.js web server, Scramjet assets, and Wisp WebSocket endpoint.
-- The app shell and proxy share one origin so the proxy service worker can use root scope.
+## Free hobby deployment with Render
 
-## Before deployment
-1. **Cloudflare Workers Paid is required for Containers.** The connected Cloudflare account currently returns an authorization error stating that Containers require the Workers Paid plan. Upgrade the account and reconnect/reauthorize Cloudflare before attempting a deployment. Do not deploy this Worker to the production account until a separate staging target is configured.
-2. Install Node.js 22 and Docker locally.
-3. Run `npm install` at the repository root.
-4. Run `npx wrangler login`, then `npx wrangler deploy`.
-5. After the image provisions, test `/health`, the app shell, Scramjet assets, and the `/wisp/` WebSocket upgrade.
-6. Only then attach the production hostname. This Worker serves the app shell and proxy together; switch the Pages route only when ready.
+The repository includes a `render.yaml` Blueprint and a Dockerfile. To deploy:
 
-## Security and launch checklist
-The proxy can act as an open web gateway. Before public launch, put the proxy behind Cloudflare Access or an equivalent authenticated session gate; the current same-origin check is not authentication. Add edge-level WAF rate limits (the in-process limits are per-container-instance and reset on restarts), connection caps, timeouts, monitoring, and an acceptable-use policy. Do not log full URLs, cookies, authorization headers, or page contents. Validate target URLs and block private, loopback, link-local, and metadata-service destinations to prevent SSRF.
+1. Create a free account at https://render.com.
+2. Connect the GitHub account that owns `askinissotuff/nova-browser`.
+3. Open the repository's feature branch `feat/cloudflare-proxy-foundation` in Render's New Blueprint flow, or create a Web Service from that branch.
+4. Select the `render.yaml` Blueprint and keep the service plan set to **Free**.
+5. Wait for the first build. Render will provide an `onrender.com` URL.
+6. Open that URL and test the Nova shell, then test a simple public website through the browser.
 
-## Current validation status
-The feature branch CI validates the Wrangler Worker bundle, browser/server JavaScript syntax, Docker image build, container health endpoint, required Scramjet static assets, and rejection of a cross-origin Wisp WebSocket upgrade. These checks do not yet prove a real browser can navigate websites through Scramjet/Wisp. A staging deployment and browser-level end-to-end test are still required. The current Cloudflare account cannot provision Containers until its Workers Paid plan requirement is met.
+Render supports inbound WebSockets on web services. Free services sleep after 15 minutes without inbound HTTP/WebSocket activity and can take about a minute to wake. Free service outbound bandwidth and build minutes are limited. This is suitable for a hobby test, not a reliable public browser service.
 
-## Important
-A static Pages site alone cannot host this Node.js/WebSocket proxy. This scaffold is not yet a finished browser integration: Nova's current direct-iframe engine still needs to be wired to Scramjet's client/controller API, and package/API compatibility plus production security must be verified with a local build and smoke tests before deployment.
+## Important security and testing notes
+
+- Do not publish an unauthenticated proxy as a public service. Add an access gate and edge-level abuse controls before sharing it.
+- Wisp is a general-purpose network tunnel. Its destination restrictions must be verified against the exact installed Wisp version; frontend URL checks alone do not prevent SSRF.
+- The in-process connection limits are temporary and per-instance, not a replacement for edge rate limits.
+- A successful container build and health check do not prove Scramjet's controller, service worker, Libcurl transport, and Wisp versions interoperate in a real browser.
+- Test with a staging URL first. Do not change production DNS or the live Nova site until browser-level tests pass.
+
+## Current status
+
+The feature branch contains the Scramjet/Wisp browser integration, Node server, Docker setup, and free Render Blueprint. Deployment and real-browser verification still require connecting the repository to Render and testing the generated service URL. Cloudflare Workers Paid is not needed for this Render path.
