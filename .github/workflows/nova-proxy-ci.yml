@@ -14,6 +14,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install Worker dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate Wrangler configuration and Worker bundle
+        run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
       - name: Check browser engine syntax
         run: node --check browser-engine.js
       - name: Check proxy server syntax
