@@ -88,14 +88,9 @@
       eventHandler.addEventToCapture("contextmenu");
       frame = controller.createFrame(element, {
         plugins: [
-          new utils.HttpCachePlugin(),
-          new utils.UrlWatcherPlugin((url) => {
-            element.dispatchEvent(new CustomEvent("nova:urlchange", { detail: { url } }));
-          }),
           eventHandler,
           new utils.LinkHandlerPlugin((url) => {
-            // Scramjet reports target=_blank and middle-click links here.
-            // NOVA intentionally keeps navigation in the current workspace tab.
+            // Route links that request a new browsing context into this tab.
             try { frame.go(url instanceof URL ? url.href : String(url)); }
             catch { /* Ignore malformed or unsupported destinations. */ }
           })
@@ -105,7 +100,7 @@
       // into "/undefined". Modern single-page apps often omit that optional
       // argument, so preserve the current proxied URL in that case.
       frame.hooks.init.post.tap((context) => {
-        // Preserve SPA history semantics in every proxied browsing context.
+        // Preserve SPA history semantics in proxied browsing contexts.
         const history = context.window.history;
         for (const method of ["pushState", "replaceState"]) {
           const original = history[method];
@@ -113,28 +108,6 @@
             return original.call(this, state, unused, url ?? context.client.url.href);
           };
         }
-
-        // Keep ordinary target=_blank links and window.open navigations
-        // inside the current NOVA tab instead of creating an untracked tab.
-        const doc = context.window.document;
-        doc.addEventListener("click", (event) => {
-          const anchor = event.target?.closest?.("a[target='_blank'], a[target='_new']");
-          if (!anchor || !anchor.href) return;
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          try {
-            frame.go(new URL(anchor.href, context.client.url.href).href);
-          } catch { /* Ignore malformed or unsupported destinations. */ }
-        }, true);
-        try {
-          context.window.open = (url) => {
-            if (url) {
-              try { frame.go(new URL(String(url), context.client.url.href).href); }
-              catch { /* Ignore malformed or unsupported destinations. */ }
-            }
-            return context.window;
-          };
-        } catch { /* Some sites lock down window.open. */ }
       });
       managed.set(element, frame);
     }
