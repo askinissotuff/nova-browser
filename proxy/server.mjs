@@ -12,6 +12,26 @@ const resolveDir = (id) => path.dirname(require.resolve(id));
 const app = express();
 app.disable("x-powered-by");
 
+// Wisp is a raw TCP tunnel, so enforce destination restrictions at the
+// transport layer rather than relying on the browser-side URL validator.
+Object.assign(wisp.options, {
+  allow_private_ips: false,
+  allow_loopback_ips: false,
+  allow_direct_ip: false,
+  allow_udp_streams: false,
+  allow_tcp_streams: true,
+  stream_limit_total: 24,
+  stream_limit_per_host: 6,
+  port_whitelist: [80, 443],
+  parse_real_ip: false
+});
+
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
+
 app.get("/health", (_req, res) => res.json({ ok: true, service: "nova-proxy" }));
 app.use("/scram/", express.static(scramjetPath, { fallthrough: false }));
 app.use("/utils/", express.static(resolveDir("@mercuryworkshop/scramjet-utils"), { fallthrough: false }));
@@ -20,10 +40,87 @@ app.use("/libcurl/", express.static(resolveDir("@mercuryworkshop/libcurl-transpo
 app.use(express.static(path.join(here, "public"), { index: "index.html" }));
 
 const server = http.createServer(app);
+const connectionCounts = new Map();
+const connectionWindows = new Map();
+const WINDOW_MS = 60_000;
+const MAX_CONNECTIONS_PER_IP = 6;
+const MAX_NEW_CONNECTIONS_PER_WINDOW = 20;
+const MAX_TOTAL_CONNECTIONS = 250;
+
+function rejectUpgrade(socket, status = "403 Forbidden") {
+  socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+  socket.destroy();
+}
+
 server.on("upgrade", (req, socket, head) => {
-  if (new URL(req.url ?? "/", "http://localhost").pathname === "/wisp/") {
+  let origin;
+  try {
+    origin = new URL(req.headers.origin ?? "");
+  } catch {
+    rejectUpgrade(socket);
+    return;
+  }
+
+  // Only accept browser WebSocket upgrades originating from this app origin.
+  const expectedProtocol = req.socket.encrypted ? "https:" : "http:";
+  if (
+    origin.host !== req.headers.host ||
+    origin.protocol !== expectedProtocol ||
+    origin.username ||
+    origin.password ||
+    new URL(req.url ?? "/", "http://localhost").pathname !== "/wisp/"
+  ) {
+    rejectUpgrade(socket);
+    return;
+  }
+
+  // Cloudflare supplies CF-Connecting-IP at the edge. Fall back to the
+  // immediate peer for local development; never trust X-Forwarded-For here.
+  const forwardedIp = req.headers["cf-connecting-ip"];
+  const ip = (typeof forwardedIp === "string" && forwardedIp.length <= 64
+    ? forwardedIp
+    : req.socket.remoteAddress) || "unknown";
+  const now = Date.now();
+
+  for (const [key, window] of connectionWindows) {
+    if (now - window.startedAt >= WINDOW_MS) connectionWindows.delete(key);
+  }
+  if (connectionWindows.size > 10_000) {
+    rejectUpgrade(socket, "503 Service Unavailable");
+    return;
+  }
+
+  const window = connectionWindows.get(ip) ?? { startedAt: now, count: 0 };
+  if (now - window.startedAt >= WINDOW_MS) {
+    window.startedAt = now;
+    window.count = 0;
+  }
+  window.count += 1;
+  connectionWindows.set(ip, window);
+
+  const active = connectionCounts.get(ip) ?? 0;
+  if (
+    window.count > MAX_NEW_CONNECTIONS_PER_WINDOW ||
+    active >= MAX_CONNECTIONS_PER_IP ||
+    [...connectionCounts.values()].reduce((sum, count) => sum + count, 0) >= MAX_TOTAL_CONNECTIONS
+  ) {
+    rejectUpgrade(socket, "429 Too Many Requests");
+    return;
+  }
+
+  connectionCounts.set(ip, active + 1);
+  socket.once("close", () => {
+    const remaining = (connectionCounts.get(ip) ?? 1) - 1;
+    if (remaining > 0) connectionCounts.set(ip, remaining);
+    else connectionCounts.delete(ip);
+  });
+
+  try {
     wisp.routeRequest(req, socket, head);
-  } else socket.destroy();
+  } catch {
+    socket.destroy();
+  }
 });
+
 const port = Number(process.env.PORT || 8080);
 server.listen(port, "0.0.0.0", () => console.log(`NOVA proxy listening on ${port}`));
