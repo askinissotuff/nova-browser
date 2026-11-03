@@ -23,6 +23,7 @@ Object.assign(wisp.options, {
   stream_limit_total: 24,
   stream_limit_per_host: 6,
   port_whitelist: [80, 443],
+  hostname_blacklist: [/^(?:localhost|metadata|metadata\.google\.internal|instance-data)(?:\\.|$)/i, /(?:^|\\.)(?:localhost|local|internal)$/i],
   parse_real_ip: false
 });
 
@@ -45,7 +46,7 @@ const connectionWindows = new Map();
 const WINDOW_MS = 60_000;
 const MAX_CONNECTIONS_PER_IP = 6;
 const MAX_NEW_CONNECTIONS_PER_WINDOW = 20;
-const MAX_TOTAL_CONNECTIONS = 250;
+const MAX_TOTAL_CONNECTIONS = 250;\nlet totalConnections = 0;
 
 function rejectUpgrade(socket, status = "403 Forbidden") {
   socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
@@ -62,7 +63,7 @@ server.on("upgrade", (req, socket, head) => {
   }
 
   // Only accept browser WebSocket upgrades originating from this app origin.
-  const expectedProtocol = req.socket.encrypted ? "https:" : "http:";
+  let expectedProtocol = req.socket.encrypted ? "https:" : "http:";\n  // The Worker terminates TLS before forwarding HTTP to the container.\n  try {\n    const edgeInfo = JSON.parse(String(req.headers["cf-visitor"] ?? "{}"));\n    if (edgeInfo.scheme === "https" || edgeInfo.scheme === "http") expectedProtocol = edgeInfo.scheme + ":";\n  } catch { /* local/non-Cloudflare request: use the socket scheme */ }
   if (
     origin.host !== req.headers.host ||
     origin.protocol !== expectedProtocol ||
@@ -102,13 +103,13 @@ server.on("upgrade", (req, socket, head) => {
   if (
     window.count > MAX_NEW_CONNECTIONS_PER_WINDOW ||
     active >= MAX_CONNECTIONS_PER_IP ||
-    [...connectionCounts.values()].reduce((sum, count) => sum + count, 0) >= MAX_TOTAL_CONNECTIONS
+    totalConnections >= MAX_TOTAL_CONNECTIONS
   ) {
     rejectUpgrade(socket, "429 Too Many Requests");
     return;
   }
 
-  connectionCounts.set(ip, active + 1);
+  connectionCounts.set(ip, active + 1);\n  totalConnections += 1;
   socket.once("close", () => {
     const remaining = (connectionCounts.get(ip) ?? 1) - 1;
     if (remaining > 0) connectionCounts.set(ip, remaining);
