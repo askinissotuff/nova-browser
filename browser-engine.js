@@ -70,7 +70,7 @@
     el.dataset.tab = String(tabId);
     el.title = "NOVA proxied website";
     el.referrerPolicy = "no-referrer";
-    el.setAttribute("allow", "fullscreen; autoplay");
+    el.setAttribute("allow", "fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write");
     if (typeof onLoad === "function") el.addEventListener("load", onLoad);
     return el;
   }
