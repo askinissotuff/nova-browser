@@ -84,10 +84,12 @@
       const eventHandler = new utils.EventHandlerPlugin();
       // utils 0.0.3 requires events to be enabled explicitly.
       eventHandler.addEventToCapture("click");
+      eventHandler.addEventToCapture("auxclick");
+      eventHandler.addEventToCapture("contextmenu");
       frame = controller.createFrame(element, {
         plugins: [
           eventHandler,
-          new utils.LinkHandlerPlugin((url) => frame.go(url))
+          new utils.LinkHandlerPlugin((url) => frame.go(url instanceof URL ? url.href : String(url)))
         ]
       });
       managed.set(element, frame);
