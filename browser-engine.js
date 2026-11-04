@@ -1,45 +1,158 @@
-/* NOVA in-page browser engine.
- * This module intentionally supports ordinary HTTP(S) iframe navigation only.
- * It does not proxy, rewrite, or fetch third-party website traffic.
- */
-(function () {
-  'use strict';
+/* NOVA browser engine: Scramjet 2.x over Wisp. */
+(() => {
+  "use strict";
+  let ready;
+  const managed = new WeakMap();
+
+  const loadScript = (src) => new Promise((resolve, reject) => {
+    const url = new URL(src, location.href).href;
+    const old = [...document.scripts].find((s) => s.src === url);
+    if (old?.dataset.ready === "1") return resolve();
+    const script = old || Object.assign(document.createElement("script"), { src: url });
+    script.onload = () => { script.dataset.ready = "1"; resolve(); };
+    script.onerror = () => reject(new Error("Unable to load " + src));
+    if (!old) document.head.append(script);
+  });
+
+  async function initialize() {
+    if (ready) return ready;
+    ready = (async () => {
+      if (!("serviceWorker" in navigator) || !/^https?:$/.test(location.protocol))
+        throw new Error("Proxy browsing requires HTTPS.");
+      const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
+      await navigator.serviceWorker.ready;
+
+      // Safari and Chromium can dispatch controllerchange while ready is
+      // resolving. Subscribe first, then re-check, so that transition cannot
+      // be missed and leave the app using an active-but-not-controlling worker.
+      const serviceworker = await new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (worker) => {
+          if (settled || !worker) return;
+          settled = true;
+          clearTimeout(timer);
+          navigator.serviceWorker.removeEventListener("controllerchange", check);
+          resolve(worker);
+        };
+        const check = () => {
+          const worker = navigator.serviceWorker.controller;
+          if (worker) finish(worker);
+        };
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          navigator.serviceWorker.removeEventListener("controllerchange", check);
+          reject(new Error("NOVA's proxy service worker is installed but this tab is not controlled. Close other NOVA tabs, reopen NOVA, and retry."));
+        }, 20000);
+        navigator.serviceWorker.addEventListener("controllerchange", check);
+        check();
+        // A registration's active worker is not sufficient: only the
+        // controller intercepts /~/sj/ requests for this page.
+        if (registration.active && navigator.serviceWorker.controller) {
+          finish(navigator.serviceWorker.controller);
+        }
+      });
+      await loadScript("/scram/scramjet.js");
+      await loadScript("/controller/controller.api.js");
+      await loadScript("/utils/scramjet-utils.js");
+      const api = window.$scramjetController;
+      if (!api?.Controller) throw new Error("Scramjet controller API failed to initialize.");
+      const { default: LibcurlClient } = await import("/libcurl/index.mjs");
+      const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+      const transport = new LibcurlClient({ wisp: scheme + "//" + location.host + "/wisp/" });
+      const controller = new api.Controller({
+        serviceworker,
+        transport,
+        config: {
+          prefix: "/~/sj/",
+          scramjetPath: "/scram/scramjet.js",
+          wasmPath: "/scram/scramjet.wasm",
+          injectPath: "/controller/controller.inject.js"
+        }
+      });
+      await controller.wait();
+      // Keep Scramjet's in-memory frame table alive on mobile browsers.
+      // iOS may suspend timers in background tabs, so also ping immediately
+      // whenever Safari restores or focuses this page.
+      const wakeServiceWorker = () => {
+        try { navigator.serviceWorker.controller?.postMessage("keepalive"); }
+        catch { /* The browser may be replacing the worker during an update. */ }
+      };
+      wakeServiceWorker();
+      setInterval(wakeServiceWorker, 10000);
+      window.addEventListener("focus", wakeServiceWorker);
+      window.addEventListener("pageshow", wakeServiceWorker);
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) wakeServiceWorker();
+      });
+      return controller;
+    })().catch((error) => { ready = null; throw error; });
+    return ready;
+  }
 
   function isWebUrl(value) {
     try {
-      const url = new URL(String(value), window.location.href);
-      return (url.protocol === 'http:' || url.protocol === 'https:') &&
-        !['localhost', '127.0.0.1', '::1'].includes(url.hostname);
-    } catch {
-      return false;
-    }
+      const u = new URL(String(value), location.href);
+      if (!["http:", "https:"].includes(u.protocol)) return false;
+      const h = u.hostname.toLowerCase();
+      return !(h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") ||
+        h === "127.0.0.1" || h === "::1" || h.startsWith("10.") || h.startsWith("192.168.") ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(h) || h.startsWith("169.254."));
+    } catch { return false; }
   }
 
   function createFrame(tabId, onLoad) {
-    const frame = document.createElement('iframe');
-    frame.className = 'frame';
-    frame.dataset.tab = String(tabId);
-    frame.title = 'NOVA embedded website';
-    frame.referrerPolicy = 'no-referrer';
-    frame.setAttribute('sandbox', 'allow-forms allow-scripts');
-    frame.setAttribute('allow', '');
-    if (typeof onLoad === 'function') frame.addEventListener('load', onLoad);
-    return frame;
+    const el = document.createElement("iframe");
+    el.className = "frame";
+    el.dataset.tab = String(tabId);
+    el.title = "NOVA proxied website";
+    el.referrerPolicy = "no-referrer";
+    el.setAttribute("allow", "fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write");
+    if (typeof onLoad === "function") el.addEventListener("load", onLoad);
+    return el;
   }
 
-  function navigate(frame, destination) {
-    if (!(frame instanceof HTMLIFrameElement) || !isWebUrl(destination)) {
-      return false;
+  async function navigate(element, destination) {
+    if (!(element instanceof HTMLIFrameElement) || !isWebUrl(destination)) return false;
+    const controller = await initialize();
+    let frame = managed.get(element);
+    if (!frame) {
+      const utils = window.$scramjetUtils;
+      const eventHandler = new utils.EventHandlerPlugin();
+      // utils 0.0.3 requires events to be enabled explicitly.
+      eventHandler.addEventToCapture("click");
+      eventHandler.addEventToCapture("auxclick");
+      eventHandler.addEventToCapture("contextmenu");
+      frame = controller.createFrame(element, {
+        plugins: [
+          eventHandler,
+          new utils.LinkHandlerPlugin((url) => {
+            // Route links that request a new browsing context into this tab.
+            try { frame.go(url instanceof URL ? url.href : String(url)); }
+            catch { /* Ignore malformed or unsupported destinations. */ }
+          })
+        ]
+      });
+      managed.set(element, frame);
     }
-    frame.src = new URL(destination, window.location.href).href;
+    frame.go(new URL(destination).href);
+    return true;
+  }
+
+  async function reload(element) {
+    const frame = managed.get(element);
+    if (!frame) return false;
+    frame.reload();
     return true;
   }
 
   window.NOVABrowserEngine = Object.freeze({
-    name: 'NOVA Embedded Engine',
-    mode: 'direct-iframe',
+    name: "NOVA Scramjet Engine",
+    mode: "scramjet-wisp",
+    initialize,
     isWebUrl,
     createFrame,
-    navigate
+    navigate,
+    reload
   });
 })();

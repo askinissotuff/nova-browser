@@ -1,0 +1,44 @@
+name: NOVA proxy build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/cloudflare-proxy-foundation]
+
+jobs:
+  container-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Worker dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate Wrangler configuration and Worker bundle
+        run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
+      - name: Check browser engine syntax
+        run: node --check browser-engine.js
+      - name: Check proxy server syntax
+        run: node --check proxy/server.mjs
+      - name: Build proxy container
+        run: docker build -t nova-proxy:ci .
+      - name: Start proxy container
+        run: |
+          docker run -d --rm --name nova-proxy-ci -p 8080:8080 nova-proxy:ci
+          trap 'docker stop nova-proxy-ci >/dev/null 2>&1 || true' EXIT
+          healthy=false
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/health; then
+              healthy=true
+              echo
+              break
+            fi
+            sleep 2
+          done
+          test "$healthy" = true
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/scram/scramjet.js
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/controller/controller.api.js
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/
+          node --input-type=module -e 'import net from "node:net"; const s=net.connect(8080,"127.0.0.1",()=>{const e=String.fromCharCode(13,10);s.write(["GET /wisp/ HTTP/1.1","Host: 127.0.0.1:8080","Origin: https://attacker.test","Connection: Upgrade","Upgrade: websocket","Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==","Sec-WebSocket-Version: 13","",""].join(e))}); let d=""; s.on("data",b=>d+=b); s.on("close",()=>{if(!d.startsWith("HTTP/1.1 403")){console.error(d);process.exitCode=1}}); setTimeout(()=>s.destroy(),3000).unref();'

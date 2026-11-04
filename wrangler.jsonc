@@ -1,0 +1,50 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nova-browser",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "containers": [
+    {
+      "class_name": "NovaProxyContainer",
+      "image": "./Dockerfile",
+      "instance_type": "basic",
+      "max_instances": 3
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NOVA_PROXY",
+        "class_name": "NovaProxyContainer"
+      }
+    ]
+  },
+  "exports": {
+    "NovaProxyContainer": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+  "observability": {
+    "enabled": true
+  },
+  "previews": {
+    "containers": [
+      {
+        "class_name": "NovaProxyContainer",
+        "image": "./Dockerfile",
+        "instance_type": "basic",
+        "max_instances": 1
+      }
+    ],
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "NOVA_PROXY",
+          "class_name": "NovaProxyContainer"
+        }
+      ]
+    }
+  }
+}
